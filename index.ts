@@ -22,32 +22,32 @@ const app = new Elysia()
     };
   })
 
-  .post('/print', async ({ body, set }) => {
+.post('/print', async ({ body }) => {
     try {
-      // Ensure we start with a clean buffer
-      printer.clear();
-      
       const buffer = Buffer.from(await body.image.arrayBuffer());
-
-      printer.alignCenter();
-      await printer.printImage(buffer);
-      printer.cut();
-
-      // Execute sends the raw data over the network via TCP
-      await printer.execute();
       
-      return { success: true, message: `Sent to ${PRINTER_IP}` };
+      // 1. Manually create the Image object from the buffer
+      // This skips the fs.accessSync check that is crashing your app
+      const thermalImage = new Image();
+      await thermalImage.load(buffer);
+
+      printer.clear();
+      printer.alignCenter();
+      
+      // 2. Pass the processed Image object instead of the raw buffer
+      await printer.printImage(thermalImage);
+      
+      printer.cut();
+      await printer.execute();
+
+      return { success: true };
     } catch (error) {
-      set.status = 500;
-      console.log(error)
-      return { success: false, error: 'Network printer error or timeout' };
+      console.error(error);
+      return { success: false, error: error.message };
     }
   }, {
     body: t.Object({
-      image: t.File({
-        type: 'image',
-        maxSize: '2m'
-      })
+      image: t.File()
     })
   })
   .listen(3000);
