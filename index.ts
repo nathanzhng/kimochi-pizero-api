@@ -7,8 +7,8 @@ const PRINTER_IP = '192.168.1.111';
 const printer = new ThermalPrinter({
   type: PrinterTypes.EPSON,      // Most network printers use EPSON (ESC/POS)
   interface: `tcp://${PRINTER_IP}`,
-  timeout: 5000,                 // 5 second timeout for network hiccups
-  width: 384,                    // Standard 58mm width (use 576 for 80mm)
+  timeout: 10000,                 // 5 second timeout for network hiccups
+  width: 576,                    // Standard 58mm width (use 576 for 80mm)
 });
 
 const app = new Elysia()
@@ -39,6 +39,7 @@ const app = new Elysia()
       return { success: true, message: `Sent to ${PRINTER_IP}` };
     } catch (error) {
       set.status = 500;
+      console.log(error)
       return { success: false, error: 'Network printer error or timeout' };
     }
   }, {
