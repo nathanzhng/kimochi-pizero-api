@@ -22,34 +22,49 @@ const app = new Elysia()
     };
   })
 
-.post('/print', async ({ body }) => {
-    try {
-      const buffer = Buffer.from(await body.image.arrayBuffer());
-      
-      // 1. Manually create the Image object from the buffer
-      // This skips the fs.accessSync check that is crashing your app
-      const thermalImage = new Image();
-      await thermalImage.load(buffer);
+.post('/print', async ({ body, set }) => {
+    // 1. Define a temporary file path
+    const tempFilePath = `./temp-${Date.now()}.png`;
 
+    try {
+      console.log(`📝 Saving temp file: ${tempFilePath}`);
+      
+      // 2. Save the incoming image to disk using Bun's native writer
+      await Bun.write(tempFilePath, await body.image.arrayBuffer());
+
+      // 3. Print the file (Library is happy because it gets a real path)
       printer.clear();
       printer.alignCenter();
-      
-      // 2. Pass the processed Image object instead of the raw buffer
-      await printer.printImage(thermalImage);
-      
+      await printer.printImage(tempFilePath); 
       printer.cut();
-      await printer.execute();
 
+      // 4. Send to printer
+      await printer.execute();
+      
+      console.log("✅ Print command sent!");
       return { success: true };
+
     } catch (error) {
-      console.error(error);
+      console.error("❌ Print failed:", error);
+      set.status = 500;
       return { success: false, error: error.message };
+
+    } finally {
+      // 5. Cleanup: Delete the temp file even if printing failed
+      // We use a try/catch here so a cleanup error doesn't crash the server
+      try {
+        await unlink(tempFilePath);
+        console.log(`🗑️ Deleted ${tempFilePath}`);
+      } catch (e) {
+        console.warn("⚠️ Could not delete temp file");
+      }
     }
   }, {
     body: t.Object({
       image: t.File()
     })
   })
+  
   .listen(3000);
 
 console.log(`🚀 Printer API active at http://[PI_IP_ADDRESS]:3000`);
